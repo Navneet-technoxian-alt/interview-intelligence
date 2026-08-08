@@ -53,22 +53,31 @@ function pickUnaddressedObjective(topic: PlannedTopic, previousAnswers: string[]
 function generateFollowUp(topic: PlannedTopic, previousAnswer: string, previousAnswers: string[]): string {
   const trimmed = previousAnswer.trim();
 
+  // New rule: if the topic involves chain-of-thought prompting, ask about safe prompting concepts
+  const cotRelated = /chain[-\s]?of[-\s]?thought/i.test(topic.title) ||
+    topic.objectives.some((obj) => /chain[-\s]?of[-\s]?thought/i.test(obj));
+  if (cotRelated) {
+    return `You mentioned chain-of-thought prompting. Could you discuss safe prompting practices such as zero-shot, few-shot, or structured prompting?`;
+  }
+
   if (trimmed.length < 15) {
-    return `Could you go into more detail on Day ${topic.day} ("${topic.title}")? Specifically, what did you actually do, and why?`;
+    return `Could you go into more detail on Day ${topic.day} (\"${topic.title}\")? Specifically, what did you actually do, and why?`;
   }
 
   const mentionedTool = topic.tools.find((tool) => trimmed.toLowerCase().includes(tool.toLowerCase()));
   if (mentionedTool) {
-    return `You mentioned ${mentionedTool} — what's a specific challenge you ran into while using ${mentionedTool} for "${topic.title}", and how did you resolve it?`;
+    return `You mentioned ${mentionedTool} — what's a specific challenge you ran into while using ${mentionedTool} for \"${topic.title}\", and how did you resolve it?`;
   }
 
   const nextObjective = pickUnaddressedObjective(topic, previousAnswers);
   if (nextObjective) {
-    return `Building on what you just said, how does that connect to "${nextObjective}"?`;
+    return `Building on what you just said, how does that connect to \"${nextObjective}\"?`;
   }
 
-  return `That's helpful. What would you do differently if you approached "${topic.title}" again today?`;
+  return `That's helpful. What would you do differently if you approached \"${topic.title}\" again today?`;
 }
+
+
 
 // ---------- session lifecycle ----------
 
