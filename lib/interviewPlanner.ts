@@ -37,6 +37,12 @@ export interface InterviewPlan {
  *
  * Coverage gate: guarantees at least MIN_CURRICULUM_DAYS distinct days.
  * Length gate: guarantees total planned questions >= MIN_QUESTIONS.
+ *
+ * Ordering: topics are selected by signal-priority (weakest signal first) but
+ * the final list is sorted in ascending curriculum-day order so the interview
+ * always progresses chronologically (Day 1 → Day 2 → … → Day N).
+ * Within each signal group days are also sorted ascending before selection
+ * so the priority queue itself is deterministic.
  */
 export function buildInterviewPlan(candidate: Candidate, curriculum: Curriculum): InterviewPlan {
   const dayLookup = new Map<number, CurriculumDay>(curriculum.days.map((d) => [d.day, d]));
@@ -47,13 +53,19 @@ export function buildInterviewPlan(candidate: Candidate, curriculum: Curriculum)
     .map((d) => d.day)
     .filter((day) => !attemptedDays.has(day));
 
+  // Helper: sort a list of day numbers ascending before building the priority queue.
+  // This makes within-group ordering deterministic and chronological even before
+  // the final sort below.
+  const sortAsc = (days: number[]) => [...days].sort((a, b) => a - b);
+
   // Priority order: weakest signal first, per docs/ARCHITECTURE.md §5.
+  // Each group is sorted ascending by day so selection within a group is stable.
   const priorityOrder: { day: number; reason: TopicReason }[] = [
-    ...signals.failedDays.map((day) => ({ day, reason: "failed" as const })),
-    ...signals.skippedDays.map((day) => ({ day, reason: "skipped" as const })),
-    ...signals.struggledDays.map((day) => ({ day, reason: "struggled" as const })),
-    ...neverAttemptedDays.map((day) => ({ day, reason: "never_attempted" as const })),
-    ...signals.strongDays.map((day) => ({ day, reason: "strong" as const })),
+    ...sortAsc(signals.failedDays).map((day) => ({ day, reason: "failed" as const })),
+    ...sortAsc(signals.skippedDays).map((day) => ({ day, reason: "skipped" as const })),
+    ...sortAsc(signals.struggledDays).map((day) => ({ day, reason: "struggled" as const })),
+    ...sortAsc(neverAttemptedDays).map((day) => ({ day, reason: "never_attempted" as const })),
+    ...sortAsc(signals.strongDays).map((day) => ({ day, reason: "strong" as const })),
   ];
 
   const seenDays = new Set<number>();
@@ -93,6 +105,13 @@ export function buildInterviewPlan(candidate: Candidate, curriculum: Curriculum)
       });
     }
   }
+
+  // ── Chronological sort ──────────────────────────────────────────────────
+  // Re-order the selected topics by ascending curriculum day so the interview
+  // always progresses forward (Day 1 → Day 2 → … → Day N).
+  // Personalization is fully preserved: the set of topics and the per-topic
+  // reason labels are unchanged — only the traversal order is made chronological.
+  topics.sort((a, b) => a.day - b.day);
 
   // Length gate: top up minQuestions round-robin until the total reaches
   // MIN_QUESTIONS. With >= MIN_CURRICULUM_DAYS topics at 2 questions each

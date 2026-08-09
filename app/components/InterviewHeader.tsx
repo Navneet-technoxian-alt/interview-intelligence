@@ -1,10 +1,12 @@
+// InterviewHeader.tsx – kept for API compatibility; not used in main layout
+// The interview workspace now uses InterviewSidebar for context.
 import React from 'react';
 
 type InterviewHeaderProps = {
   candidateName: string;
   candidateRole: string;
   questionNumber: number;
-  totalQuestions?: number; // optional if known
+  totalQuestions?: number;
   currentDay?: string;
   onEnd: () => void;
 };
@@ -18,25 +20,31 @@ export const InterviewHeader: React.FC<InterviewHeaderProps> = ({
   onEnd,
 }) => {
   return (
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-slate-200 border-b border-slate-700/60 pb-4 mb-4 gap-4 sticky top-0 bg-slate-900/95 z-10 py-2">
-      <div className="flex flex-col">
-        <h2 className="text-xl font-bold tracking-tight">Interview Intelligence</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          <span className="font-medium text-slate-300">{candidateName}</span> <span className="mx-1">·</span> {candidateRole}
+    <div
+      className="flex items-center justify-between py-3"
+      style={{ borderBottom: '1px solid #2a3347', color: '#e6edf3' }}
+    >
+      <div>
+        <h2 className="text-sm font-semibold" style={{ color: '#e6edf3' }}>
+          {candidateName}
+        </h2>
+        <p className="text-xs mt-0.5" style={{ color: '#8b949e' }}>
+          {candidateRole}
+          {currentDay && <> · {currentDay}</>}
         </p>
       </div>
-      <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto space-y-0 sm:space-y-1 text-sm text-slate-400">
-        <div className="flex items-center gap-3">
-          {currentDay && <span className="bg-slate-800 px-2 py-0.5 rounded text-xs border border-slate-700/50">{currentDay}</span>}
-          <span>
-            {totalQuestions ? `Q${questionNumber}/${totalQuestions}` : `Q${questionNumber}`}
-          </span>
-        </div>
+      <div className="flex items-center gap-4 text-xs" style={{ color: '#8b949e' }}>
+        <span>
+          {totalQuestions ? `Q${questionNumber}/${totalQuestions}` : `Q${questionNumber}`}
+        </span>
         <button
           onClick={onEnd}
-          className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
+          className="transition-colors focus:outline-none"
+          style={{ color: '#8b949e' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#e6edf3'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#8b949e'; }}
         >
-          End Interview
+          End
         </button>
       </div>
     </div>
