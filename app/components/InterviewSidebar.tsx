@@ -4,108 +4,118 @@ import type { Candidate } from '@/lib/types';
 interface InterviewSidebarProps {
   candidate: Candidate;
   questionNumber: number;
+  totalQuestions: number;
   currentDay: string;
   onEnd: () => void;
 }
 
 function computeStats(candidate: Candidate) {
   const skipped = candidate.missions.filter((m) => 'skipped' in m).length;
+  const failed = candidate.missions.filter(
+    (m) => 'passed' in m && !(m as { passed: boolean }).passed,
+  ).length;
   const completed = candidate.signals.missionsCompleted;
+  const total = candidate.missions.length;
   const firstTryPct =
     completed > 0
       ? Math.round((candidate.signals.missionsFirstTry / completed) * 100)
       : 0;
-  return { skipped, firstTryPct, completed };
+  const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  return { skipped, failed, firstTryPct, completed, completionPct, total };
 }
 
 export const InterviewSidebar: React.FC<InterviewSidebarProps> = ({
   candidate,
   questionNumber,
+  totalQuestions,
   currentDay,
   onEnd,
 }) => {
-  const { skipped, firstTryPct, completed } = computeStats(candidate);
+  const { skipped, failed, firstTryPct, completed, completionPct, total } = computeStats(candidate);
   const c = candidate.member;
 
-  const statRows = [
-    { label: 'Role', value: c.jobRole },
-    { label: 'Experience', value: `${c.yearsExperience} year${c.yearsExperience !== 1 ? 's' : ''}` },
-    { label: 'Missions', value: `${candidate.missions.length}` },
-    { label: 'Completed', value: `${completed}` },
-    { label: 'First-Try Rate', value: `${firstTryPct}%` },
-    { label: 'Skipped', value: `${skipped}` },
-  ];
+  // Interview progress (0–100 based on actual question count)
+  const progressPct =
+    totalQuestions > 0 ? Math.min(100, Math.round((questionNumber / totalQuestions) * 100)) : 0;
 
   return (
     <aside
-      className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-4"
+      className="w-64 xl:w-72 flex-shrink-0 flex flex-col gap-3"
       aria-label="Interview context"
     >
-      {/* Candidate context card */}
+      {/* Candidate card */}
       <div
-        className="rounded-lg p-4"
+        className="rounded-xl p-4"
         style={{ background: '#161b27', border: '1px solid #2a3347' }}
       >
-        <div className="mb-3">
-          <p className="text-[10px] uppercase tracking-wider font-semibold mb-1" style={{ color: '#8b949e' }}>
-            Candidate
-          </p>
-          <h3 className="text-sm font-semibold" style={{ color: '#e6edf3' }}>
-            {c.name}
-          </h3>
-        </div>
+        <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: '#8b949e' }}>
+          Candidate
+        </p>
+        <h3 className="text-sm font-semibold leading-snug mb-0.5" style={{ color: '#e6edf3' }}>
+          {c.name}
+        </h3>
+        <p className="text-xs mb-3 leading-snug" style={{ color: '#8b949e' }}>
+          {c.jobRole} · {c.yearsExperience}y exp
+        </p>
 
-        <div className="space-y-2">
-          {statRows.map(({ label, value }) => (
-            <div key={label} className="flex items-baseline justify-between gap-2">
-              <span className="text-xs flex-shrink-0" style={{ color: '#8b949e' }}>
-                {label}
-              </span>
-              <span
-                className="text-xs font-medium text-right truncate"
-                style={{ color: '#c9d1d9' }}
-              >
-                {value}
-              </span>
+        {/* Stat rows */}
+        <div className="space-y-2 mb-3">
+          {[
+            { label: 'Missions', value: String(total) },
+            { label: 'Completed', value: String(completed) },
+            { label: 'First-Try', value: `${firstTryPct}%` },
+            { label: 'Skipped', value: String(skipped) },
+            { label: 'Failed', value: String(failed) },
+          ].map(({ label, value }) => (
+            <div key={label} className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: '#8b949e' }}>{label}</span>
+              <span className="text-xs font-semibold" style={{ color: '#c9d1d9' }}>{value}</span>
             </div>
           ))}
         </div>
 
-        {/* Mini progress bar */}
-        <div className="mt-4">
+        {/* Mission progress */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#8b949e' }}>
+              Mission Progress
+            </span>
+            <span className="text-[10px] font-mono" style={{ color: '#8b949e' }}>
+              {completed}/{total}
+            </span>
+          </div>
           <div
-            className="w-full h-1 rounded-full overflow-hidden"
-            style={{ background: '#0d1117' }}
+            className="w-full rounded-full overflow-hidden"
+            style={{ height: 3, background: '#0d1117' }}
           >
             <div
               className="h-full rounded-full"
-              style={{
-                width: `${candidate.missions.length > 0 ? Math.round((completed / candidate.missions.length) * 100) : 0}%`,
-                background: '#3b82f6',
-              }}
+              style={{ width: `${completionPct}%`, background: '#374569' }}
             />
           </div>
         </div>
       </div>
 
-      {/* Interview context card */}
+      {/* Session context card */}
       <div
-        className="rounded-lg p-4"
+        className="rounded-xl p-4"
         style={{ background: '#161b27', border: '1px solid #2a3347' }}
       >
-        <p className="text-[10px] uppercase tracking-wider font-semibold mb-3" style={{ color: '#8b949e' }}>
-          Session Context
+        <p className="text-[9px] font-bold uppercase tracking-widest mb-3" style={{ color: '#8b949e' }}>
+          Session
         </p>
 
-        <div className="space-y-3">
+        <div className="space-y-2.5 mb-4">
           {/* Question counter */}
           <div className="flex items-center justify-between">
             <span className="text-xs" style={{ color: '#8b949e' }}>Question</span>
             <span
-              className="text-xs font-mono font-semibold px-2 py-0.5 rounded"
+              className="text-xs font-mono font-bold px-2 py-0.5 rounded"
               style={{ background: '#0d1117', color: '#3b82f6', border: '1px solid #2a3347' }}
             >
-              #{questionNumber}
+              {totalQuestions > 0
+                ? `${questionNumber} / ${totalQuestions}`
+                : `#${questionNumber}`}
             </span>
           </div>
 
@@ -122,26 +132,55 @@ export const InterviewSidebar: React.FC<InterviewSidebarProps> = ({
             </div>
           ) : null}
 
-          {/* Adaptive indicator */}
+          {/* Adaptive mode */}
           <div className="flex items-center justify-between">
             <span className="text-xs" style={{ color: '#8b949e' }}>Mode</span>
-            <span className="text-xs" style={{ color: '#22c55e' }}>Adaptive</span>
+            <span className="flex items-center gap-1.5 text-xs" style={{ color: '#4ade80' }}>
+              <span
+                style={{
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: '#22c55e', display: 'inline-block', flexShrink: 0,
+                }}
+              />
+              Adaptive
+            </span>
           </div>
         </div>
+
+        {/* Interview progress bar */}
+        {totalQuestions > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#8b949e' }}>
+                Interview Progress
+              </span>
+              <span className="text-[10px]" style={{ color: '#8b949e' }}>{progressPct}%</span>
+            </div>
+            <div
+              className="w-full rounded-full overflow-hidden"
+              style={{ height: 3, background: '#0d1117' }}
+            >
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${progressPct}%`, background: '#3b82f6', transition: 'width 0.4s ease' }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* End interview */}
       <button
         onClick={onEnd}
-        className="w-full text-xs font-medium py-2 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="w-full text-xs font-medium py-2 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         style={{
           background: 'transparent',
           border: '1px solid #2a3347',
           color: '#8b949e',
         }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color = '#e6edf3';
-          (e.currentTarget as HTMLButtonElement).style.borderColor = '#3b4560';
+          (e.currentTarget as HTMLButtonElement).style.color = '#f87171';
+          (e.currentTarget as HTMLButtonElement).style.borderColor = '#7f1d1d';
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLButtonElement).style.color = '#8b949e';

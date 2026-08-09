@@ -11,10 +11,10 @@ interface TopNavProps {
 export const TopNav: React.FC<TopNavProps> = ({ stage, onReset }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navLinks = [
-    { label: 'Interview', active: stage === 'interview' },
-    { label: 'Candidates', active: stage === 'select' },
-    { label: 'History', active: false },
+  const navLinks: { label: string; active: boolean; onClick?: () => void }[] = [
+    { label: 'Dashboard', active: stage === 'select', onClick: onReset },
+    { label: 'Candidates', active: stage === 'select', onClick: onReset },
+    { label: 'Interviews', active: stage === 'interview' || stage === 'feedback' },
   ];
 
   return (
@@ -24,13 +24,13 @@ export const TopNav: React.FC<TopNavProps> = ({ stage, onReset }) => {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
+
           {/* Logo / Wordmark */}
           <button
             onClick={onReset}
-            className="flex items-center gap-2.5 text-left group focus:outline-none"
-            aria-label="Interview Intelligence — go to candidate selection"
+            className="flex items-center gap-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+            aria-label="Interview Intelligence — go to dashboard"
           >
-            {/* Simple geometric mark */}
             <div
               className="flex-shrink-0 w-7 h-7 rounded flex items-center justify-center"
               style={{ background: '#3b82f6' }}
@@ -42,20 +42,17 @@ export const TopNav: React.FC<TopNavProps> = ({ stage, onReset }) => {
                 <rect x="8" y="8" width="5" height="5" rx="1" fill="white" fillOpacity="0.3" />
               </svg>
             </div>
-            <span
-              className="text-sm font-semibold tracking-tight"
-              style={{ color: '#e6edf3' }}
-            >
+            <span className="text-sm font-semibold tracking-tight" style={{ color: '#e6edf3' }}>
               Interview Intelligence
             </span>
           </button>
 
-          {/* Desktop nav links */}
-          <div className="hidden sm:flex items-center gap-1">
+          {/* Desktop nav */}
+          <div className="hidden sm:flex items-center gap-0.5">
             {navLinks.map((link) => (
               <button
                 key={link.label}
-                onClick={link.label === 'Candidates' ? onReset : undefined}
+                onClick={link.onClick}
                 className="px-3 py-1.5 rounded text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 style={{
                   color: link.active ? '#e6edf3' : '#8b949e',
@@ -73,21 +70,17 @@ export const TopNav: React.FC<TopNavProps> = ({ stage, onReset }) => {
             ))}
           </div>
 
-          {/* Stage pill (desktop) */}
+          {/* Right status pill (desktop) */}
           <div className="hidden sm:flex items-center gap-3">
             {stage === 'interview' && (
               <span
                 className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
-                style={{ background: '#1e2536', color: '#60a5fa', border: '1px solid #2a3347' }}
+                style={{ background: '#0d1f12', color: '#4ade80', border: '1px solid #166534' }}
               >
                 <span
                   style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: '#22c55e',
-                    display: 'inline-block',
-                    boxShadow: '0 0 0 2px #16a34a22',
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: '#22c55e', display: 'inline-block',
                   }}
                 />
                 Live Session
@@ -98,14 +91,22 @@ export const TopNav: React.FC<TopNavProps> = ({ stage, onReset }) => {
                 className="text-xs font-medium px-2.5 py-1 rounded-full"
                 style={{ background: '#1e2536', color: '#8b949e', border: '1px solid #2a3347' }}
               >
-                Interview Complete
+                Report Ready
+              </span>
+            )}
+            {stage === 'select' && (
+              <span
+                className="text-xs font-medium px-2.5 py-1 rounded-full"
+                style={{ background: '#1e2536', color: '#8b949e', border: '1px solid #2a3347' }}
+              >
+                Adaptive Mode
               </span>
             )}
           </div>
 
           {/* Mobile hamburger */}
           <button
-            className="sm:hidden p-2 rounded focus:outline-none"
+            className="sm:hidden p-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             onClick={() => setMobileOpen((v) => !v)}
             aria-label="Toggle menu"
             style={{ color: '#8b949e' }}
@@ -124,15 +125,12 @@ export const TopNav: React.FC<TopNavProps> = ({ stage, onReset }) => {
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div
-            className="sm:hidden pb-3 space-y-1"
-            style={{ borderTop: '1px solid #2a3347' }}
-          >
+          <div className="sm:hidden pb-3 pt-1 space-y-0.5" style={{ borderTop: '1px solid #2a3347' }}>
             {navLinks.map((link) => (
               <button
                 key={link.label}
                 onClick={() => {
-                  if (link.label === 'Candidates') onReset();
+                  link.onClick?.();
                   setMobileOpen(false);
                 }}
                 className="block w-full text-left px-3 py-2 rounded text-sm font-medium"

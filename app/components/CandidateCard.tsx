@@ -9,12 +9,17 @@ interface CandidateCardProps {
 
 function computeStats(candidate: Candidate) {
   const skipped = candidate.missions.filter((m) => 'skipped' in m).length;
+  const failed = candidate.missions.filter(
+    (m) => 'passed' in m && !(m as { passed: boolean }).passed,
+  ).length;
   const completed = candidate.signals.missionsCompleted;
+  const total = candidate.missions.length;
   const firstTryPct =
     completed > 0
       ? Math.round((candidate.signals.missionsFirstTry / completed) * 100)
       : 0;
-  return { skipped, firstTryPct, completed };
+  const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  return { skipped, failed, firstTryPct, completed, completionPct, total };
 }
 
 export const CandidateCard: React.FC<CandidateCardProps> = ({
@@ -22,8 +27,12 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
   isSelected,
   onSelect,
 }) => {
-  const { skipped, firstTryPct, completed } = computeStats(candidate);
+  const { skipped, failed, firstTryPct, completed, completionPct, total } = computeStats(candidate);
   const c = candidate.member;
+
+  // Colour for first-try rate
+  const firstTryColor =
+    firstTryPct >= 70 ? '#4ade80' : firstTryPct >= 40 ? '#fbbf24' : '#f87171';
 
   return (
     <li
@@ -37,103 +46,108 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({
           onSelect();
         }
       }}
-      className="relative cursor-pointer rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-colors duration-150"
+      className="relative cursor-pointer rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all duration-150"
       style={{
-        background: isSelected ? '#1e2536' : '#161b27',
+        background: isSelected ? '#1a2540' : '#161b27',
         border: `1px solid ${isSelected ? '#3b82f6' : '#2a3347'}`,
         listStyle: 'none',
       }}
       onMouseEnter={(e) => {
         if (!isSelected) {
-          (e.currentTarget as HTMLElement).style.borderColor = '#3b4560';
+          (e.currentTarget as HTMLElement).style.borderColor = '#374569';
+          (e.currentTarget as HTMLElement).style.background = '#1a2030';
         }
       }}
       onMouseLeave={(e) => {
         if (!isSelected) {
           (e.currentTarget as HTMLElement).style.borderColor = '#2a3347';
+          (e.currentTarget as HTMLElement).style.background = '#161b27';
         }
       }}
     >
-      {/* Selected indicator bar */}
+      {/* Selected accent bar */}
       {isSelected && (
         <div
-          className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full"
+          className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full"
           style={{ background: '#3b82f6' }}
         />
       )}
 
-      <div className="p-5">
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3
-              className="text-sm font-semibold truncate"
-              style={{ color: '#e6edf3' }}
-            >
+      <div className="p-5 pl-6">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold leading-tight truncate" style={{ color: '#e6edf3' }}>
               {c.name}
             </h3>
-            <p className="text-xs mt-0.5 truncate" style={{ color: '#8b949e' }}>
+            <p className="text-xs mt-0.5 leading-tight truncate" style={{ color: '#8b949e' }}>
               {c.jobRole}
             </p>
           </div>
           <span
-            className="flex-shrink-0 text-xs px-2 py-0.5 rounded font-medium"
-            style={{ background: '#0d1117', color: '#8b949e', border: '1px solid #2a3347' }}
+            className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-semibold"
+            style={{ background: '#1e2536', color: '#8b949e', border: '1px solid #2a3347' }}
           >
-            {c.yearsExperience}y exp
+            {c.yearsExperience}y
           </span>
         </div>
 
-        {/* Divider */}
-        <div className="my-4" style={{ height: 1, background: '#1e2536' }} />
-
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* Stats grid: 4 items */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 mb-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#8b949e' }}>
+            <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8b949e' }}>
               Missions
             </p>
             <p className="text-sm font-semibold" style={{ color: '#c9d1d9' }}>
-              {candidate.missions.length}
+              {total}
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#8b949e' }}>
+            <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8b949e' }}>
               First-Try
             </p>
-            <p className="text-sm font-semibold" style={{ color: firstTryPct >= 70 ? '#22c55e' : firstTryPct >= 40 ? '#f59e0b' : '#c9d1d9' }}>
+            <p className="text-sm font-semibold" style={{ color: firstTryColor }}>
               {firstTryPct}%
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#8b949e' }}>
+            <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8b949e' }}>
               Skipped
             </p>
-            <p className="text-sm font-semibold" style={{ color: skipped > 0 ? '#f59e0b' : '#c9d1d9' }}>
+            <p className="text-sm font-semibold" style={{ color: skipped > 0 ? '#fbbf24' : '#8b949e' }}>
               {skipped}
+            </p>
+          </div>
+          <div>
+            <p className="text-[9px] font-bold uppercase tracking-widest mb-0.5" style={{ color: '#8b949e' }}>
+              Failed
+            </p>
+            <p className="text-sm font-semibold" style={{ color: failed > 0 ? '#f87171' : '#8b949e' }}>
+              {failed}
             </p>
           </div>
         </div>
 
-        {/* Completion bar: visual only, derived from real data */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: '#8b949e' }}>
-              Completed
+        {/* Mission progress bar */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#8b949e' }}>
+              Progress
             </span>
-            <span className="text-[10px]" style={{ color: '#8b949e' }}>
-              {completed}/{candidate.missions.length}
+            <span className="text-[10px] font-mono" style={{ color: '#8b949e' }}>
+              {completed}/{total}
             </span>
           </div>
           <div
-            className="w-full h-1 rounded-full overflow-hidden"
-            style={{ background: '#0d1117' }}
+            className="w-full rounded-full overflow-hidden"
+            style={{ height: 3, background: '#1e2536' }}
           >
             <div
-              className="h-full rounded-full transition-all duration-300"
+              className="h-full rounded-full"
               style={{
-                width: `${candidate.missions.length > 0 ? Math.round((completed / candidate.missions.length) * 100) : 0}%`,
-                background: isSelected ? '#3b82f6' : '#3b4560',
+                width: `${completionPct}%`,
+                background: isSelected ? '#3b82f6' : '#374569',
+                transition: 'width 0.3s ease',
               }}
             />
           </div>
