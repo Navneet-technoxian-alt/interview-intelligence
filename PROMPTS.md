@@ -2,54 +2,52 @@
 
 ## 1. Project Overview
 **Project Name:** Interview Intelligence
-**Purpose:** An adaptive platform for conducting dynamic technical interviews. The system interacts with candidates through a conversational interface, evaluating their responses based on curriculum data and providing feedback.
+**Purpose:** An adaptive platform for conducting technical interviews. The system interacts with candidates through a conversational interface, personalizing questions from curriculum and candidate mission-history data, and producing structured feedback at the end.
 
 ## 2. Methodology: AI as a Development Assistant
-Throughout the development of this project, AI coding assistants were leveraged as collaborative tools to accelerate the development lifecycle. 
+AI coding assistance was used throughout development, working directly against the project's own supplied files (`curriculum.json`, `candidate-profiles.json`, `technical-specification.md`) rather than from general assumptions. Every generated file was reviewed, type-checked, linted, built, and functionally tested against the real data before being accepted. This log reflects the actual work done in this repository — not a generic or representative summary.
 
-Every piece of AI-generated code, architecture recommendation, or UI component was reviewed, systematically tested, modified to fit the specific project constraints, and manually integrated by the developer. The final application architecture, business logic, and creative direction are the product of human design and decision-making. 
+## 3. Actual Development Areas & Prompt Summaries
 
-This log distinguishes between actual verifiable development activities present in the repository and representative summaries of the kinds of prompts used during the AI-assisted development process.
+### Requirements Analysis
+AI was asked to read the supplied curriculum, candidate, and technical-spec files and produce `docs/REQUIREMENTS.md` — mandatory requirements, exact endpoints, request/response schemas, and an explicit list of what was *not* specified in the source files, rather than inventing gaps.
 
-## 3. Actual Development Areas & Representative Prompts
-
-The AI assistant was utilized across several key phases of the project. Below are the actual development areas focused on during this hackathon, alongside representative summaries of the prompts used.
-
-### Project Setup & Requirements Analysis
-AI assisted in scaffolding the Next.js project and analyzing foundational requirements.
-* **Representative prompts included:** "Generate a Next.js 15 App Router project structure tailored for a conversational interface." and "What are the core technical requirements for building a real-time interview agent in React?"
+### Architecture & Hackathon Acceptance Gates
+AI was asked to produce `docs/ARCHITECTURE.md`, encoding the mandatory hackathon requirements (minimum 8 questions, ≥4 curriculum days, adaptive follow-ups, session context, personalization, structured feedback, the exact `POST /api/interview` contract) as explicit, checkable acceptance gates tied to specific design mechanisms.
 
 ### Candidate & Curriculum Data Modeling
-AI helped draft data structures for candidate profiles and interview topics without relying on a production database.
-* **Representative prompts included:** "Create TypeScript interfaces for candidate profiles, including experience levels and technical skills." and "Help me define a local data structure for storing modular curriculum topics."
+AI defined TypeScript types (`lib/types.ts`) directly from the shape observed in `data/candidate-profiles.json` and `data/curriculum.json` — including the `Mission` union type (`passed`/`attempts` vs. `skipped`) — and typed loaders (`lib/data.ts`) for both JSON files. No database was introduced.
 
-### Candidate Analysis & Interview Planning
-AI was consulted to outline logic for analyzing candidate skills and planning interview stages.
-* **Representative prompts included:** "Suggest a logic flow for analyzing a candidate's background to determine the appropriate initial technical questions." and "How can I structure a multi-stage interview plan within a state object?"
+### Candidate Analysis Logic
+AI implemented `lib/candidateAnalysis.ts`, a pure function deriving skipped/failed/struggled/strong curriculum days and a first-try ratio from a single candidate's own mission history. This is rule-based analysis over the supplied JSON, not a machine-learning or LLM-based assessment.
 
-### Adaptive Conversation Logic & Session State
-To build the core conversational engine, AI helped brainstorm data structures and state machine patterns for managing the interview flow.
-* **Representative prompts included:** "Help me design a TypeScript interface for an interview conversation state that tracks the current question, candidate response history, and dynamic follow-up context." and "Outline a logical flow for an adaptive interview engine where the difficulty of the next question is determined by the completeness of the previous answer."
+### Interview Planning Logic
+AI implemented `lib/interviewPlanner.ts`, which builds a personalized topic queue per candidate and enforces the two hard gates (≥8 questions, ≥4 curriculum days) with explicit fallback logic for sparse candidate profiles.
 
-### POST /api/interview Implementation
-AI provided boilerplate for handling incoming chat requests and interacting with the LLM API within the Next.js backend.
-* **Representative prompts included:** "Write a Next.js App Router API route for `POST /api/interview` that processes candidate messages and handles an AI stream."
+### Adaptive Conversation Engine & Session State
+AI implemented `lib/conversationEngine.ts` and `lib/sessionStore.ts` — an in-memory, `sessionId`-keyed session store, template-based primary/follow-up question generation driven by the current topic and the candidate's previous answer, and end-of-interview feedback generation. **This logic is rule-based (string templates over structured data), not an LLM call** — the backend does not stream from or call any external AI/LLM API.
+
+### `POST /api/interview` Implementation
+AI implemented the single required Next.js App Router route handler (`app/api/interview/route.ts`), branching on session existence and payload shape to serve Start / Turn / End responses matching the exact contract in `technical-specification.md`. It performs synchronous request validation and in-memory state lookups — there is no AI/LLM streaming involved.
 
 ### Frontend Interview UI & Feedback UI
-The frontend development utilized AI for generating React components and ensuring type safety.
-* **Representative prompts included:** "Create a responsive React component for a chat interface displaying system questions and user inputs." and "Design a feedback summary UI component that renders scores for code correctness, communication, and problem-solving."
+AI built the candidate-selection, conversation, and feedback screens (`app/page.tsx`, `app/components/FeedbackScreen.tsx`), wired to `POST /api/interview`. The feedback screen renders only `summary`, `strengths`, `gaps`, and `next` as returned by the API. **No numeric scores (e.g., "code correctness," "communication," "problem-solving") were implemented or fabricated** — the API contract doesn't define score fields, and the team explicitly avoided inventing any.
 
-### Debugging, Build, & Type Checking
-AI served as a rapid troubleshooting tool for compilation issues and TypeScript errors.
-* **Representative prompts included:** "Help me fix a 'Type is not assignable' error in my TypeScript conversation state file." and "How can I resolve Next.js hydration mismatch errors when rendering dynamic timestamps?"
-
-### Git/GitHub Workflow & Deployment
-Deployment configurations and version control workflows were streamlined using AI recommendations.
-* **Representative prompts included:** "What are the standard configurations for deploying a Next.js App Router project?" and "Provide a basic `.gitignore` configuration for a Next.js project."
+### Debugging, Build & Type Checking
+AI resolved real issues encountered during this project: a Next.js 16 `LayoutProps<"/">` typed-route error (fixed by running `next typegen`), and a production build failure caused by `next/font/google` requiring network access unavailable in the build environment (fixed by switching to the system font stack). `npx tsc --noEmit`, `npx eslint .`, and `npx next build` were run and confirmed clean after every change.
 
 ### UI Refinement
-Enhancing visual aesthetics involved asking for styling tips and standard CSS solutions.
-* **Representative prompts included:** "Suggest CSS transitions for a chat interface where new messages slide in smoothly from the bottom." and "How can I improve the accessibility and contrast of my call-to-action buttons?"
+AI restyled the feedback screen into a dark, glass-card dashboard (navy background, purple/blue accents) using only the existing Tailwind setup and hand-written inline SVG icons — no new dependencies or external images were added, and no CSS transition/animation work was done.
 
-## 4. Conclusion
-The integration of AI coding assistants significantly accelerated the prototyping and implementation phases of the Interview Intelligence project. By handling repetitive coding tasks, offering syntax corrections, and providing architectural suggestions, the AI allowed the developer to focus on the overarching user experience and complex business logic. All final implementations remain the result of human oversight, testing, and refinement.
+## 4. What Was Not Done
+For accuracy, the following are explicitly **not** part of this project and are not claimed above:
+- No external LLM/AI API integration or streaming — the interview logic is deterministic and template-based.
+- No score/rubric system (correctness, communication, problem-solving, etc.).
+- No git or GitHub workflow — the project has no `.git` repository in this environment, and no commits or deployment configuration were made.
+- No message slide-in animations or other CSS transition work.
+- No timestamp rendering, so no related hydration-mismatch issue arose.
+- The project runs on Next.js 16.3.0, not Next.js 15.
+
+## 5. Conclusion
+AI assistance accelerated scaffolding, data modeling, rule-based planning/analysis logic, the API route, and UI implementation. All logic was reviewed, type-checked, linted, built, and functionally verified end-to-end against the real candidate and curriculum data before being accepted into the project.
+
