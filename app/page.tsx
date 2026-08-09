@@ -1,8 +1,10 @@
 // app/page.tsx – Interview Agent UI (Polished)
 'use client';
-import { useState, FormEvent } from 'react';
+
 import { Candidate, Feedback, InterviewResponseBody, InProgressResponseBody, FinalResponseBody } from '@/lib/types';
 import { allCandidates } from '@/lib/data';
+import { InterviewHeader } from '@/app/components/InterviewHeader';
+import { useState, FormEvent, useRef, useEffect } from 'react';
 
 // Helper to detect if response is final
 function isFinal(resp: InterviewResponseBody): resp is FinalResponseBody {
@@ -24,6 +26,15 @@ export default function InterviewAgent() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll conversation
+  useEffect(() => {
+    if (stage === 'interview') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, loading, stage]);
 
   // ---------- Candidate selection ----------
   const startInterview = async (selected: Candidate) => {
@@ -50,7 +61,7 @@ export default function InterviewAgent() {
   // ---------- Conversation ----------
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !sessionId) return;
+    if (!input.trim() || !sessionId || loading) return;
     const userMsg = input.trim();
     setMessages((prev) => [...prev, { role: 'candidate', text: userMsg }]);
     setInput('');
@@ -74,6 +85,13 @@ export default function InterviewAgent() {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(e as unknown as FormEvent);
+    }
+  };
+
   const reset = () => {
     setStage('select');
     setCandidate(null);
@@ -82,164 +100,264 @@ export default function InterviewAgent() {
     setFeedback(null);
     setInput('');
     setLoading(false);
+    setSelectedCandidateId(null);
   };
 
-  // ---------- Rendering helpers ----------
-  const renderSelection = () => (
-    <div className="max-w-3xl w-full space-y-8 text-gray-100">
-      {/* Hero */}
-      <div className="text-center space-y-3">
-        <h1 className="text-4xl font-bold">Interview Intelligence</h1>
-        <p className="text-xl font-medium">Build the interviewer, not the interview.</p>
-        <p className="text-sm text-gray-400">An adaptive technical interview built around your learning journey.</p>
-        <div className="inline-block bg-indigo-700 text-white text-xs font-semibold px-2 py-1 rounded mt-2">
-          AI TECHNICAL INTERVIEW AGENT
+  const renderSelection = () => {
+    const selectedCandidate = selectedCandidateId
+      ? allCandidates.find((c) => c.member.id === selectedCandidateId)
+      : null;
+
+    return (
+      <div className="max-w-4xl w-full mx-auto space-y-10 py-10 px-4">
+        {/* Hero */}
+        <div className="text-center space-y-3">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-100">Interview Intelligence</h1>
+          <p className="text-lg font-medium text-slate-300">Build the interviewer, not the interview.</p>
+          <p className="text-sm text-slate-400 max-w-xl mx-auto">
+            An adaptive technical interview built around each candidate's learning journey.
+          </p>
+        </div>
+
+        {/* Candidate Area */}
+        <div className="space-y-6">
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {allCandidates.map((c) => {
+              const { skipped } = computeMissionStats(c);
+              const isSelected = selectedCandidateId === c.member.id;
+
+              return (
+                <li
+                  key={c.member.id}
+                  onClick={() => setSelectedCandidateId(c.member.id)}
+                  className={`
+                    relative bg-slate-800 rounded-lg p-5 cursor-pointer border transition-all duration-200
+                    hover:border-slate-600
+                    ${
+                      isSelected
+                        ? 'border-blue-500 bg-slate-800/90 shadow-sm'
+                        : 'border-slate-700/50'
+                    }
+                  `}
+                >
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold text-slate-100">{c.member.name}</h3>
+                    <p className="text-sm text-slate-400">
+                      {c.member.jobRole} <span className="mx-1">·</span> {c.member.yearsExperience} yr(s) exp
+                    </p>
+                  </div>
+
+                  <div className="h-px w-full bg-slate-700/50 my-4" />
+
+                  <div className="flex justify-between items-center text-sm">
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold mb-0.5">Missions</span>
+                      <span className="font-medium text-slate-300">{c.missions.length}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold mb-0.5">First-Try</span>
+                      <span className="font-medium text-slate-300">
+                        {((c.signals.missionsFirstTry / (c.signals.missionsCompleted || 1)) * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold mb-0.5">Skipped</span>
+                      <span className="font-medium text-slate-300">{skipped}</span>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Primary Action */}
+          <div className="flex justify-center pt-4">
+            <button
+              onClick={() => selectedCandidate && startInterview(selectedCandidate)}
+              disabled={!selectedCandidate}
+              className={`
+                px-8 py-3 rounded-md font-medium transition-colors
+                ${
+                  selectedCandidate
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                }
+              `}
+            >
+              Start Interview
+            </button>
+          </div>
         </div>
       </div>
-
-      {/* Candidate cards */}
-      <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {allCandidates.map((c) => {
-          const { failed, skipped } = computeMissionStats(c);
-          return (
-            <li
-              key={c.member.id}
-              className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 cursor-pointer border border-gray-600"
-              onClick={() => startInterview(c)}
-            >
-              <h2 className="text-lg font-semibold mb-1">{c.member.name}</h2>
-              <p className="text-sm text-gray-300 mb-1">
-                {c.member.jobRole} – {c.member.yearsExperience} yr(s) experience
-              </p>
-              <p className="text-sm text-gray-300 mb-1">Completed missions: {c.missions.length}</p>
-              <p className="text-sm text-gray-300 mb-1">
-                First‑try ratio: {(c.signals.missionsFirstTry / (c.signals.missionsCompleted || 1)).toFixed(2)}
-              </p>
-              {(failed > 0 || skipped > 0) && (
-                <p className="text-sm text-gray-300 mb-1">
-                  {failed > 0 && `Failed: ${failed}`}
-                  {failed > 0 && skipped > 0 && ', '}
-                  {skipped > 0 && `Skipped: ${skipped}`}
-                </p>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
+    );
+  };
 
   const renderInterview = () => {
     const agentMessages = messages.filter((m) => m.role === 'agent');
-    const questionNumber = agentMessages.length; // simplistic count
+    const questionNumber = agentMessages.length;
     const lastAgent = agentMessages[agentMessages.length - 1];
     let currentDay = '';
     if (lastAgent) {
       const match = /Day\s+(\d+)/i.exec(lastAgent.text);
       if (match) currentDay = `Day ${match[1]}`;
     }
+
     return (
-      <div className="flex flex-col max-w-3xl w-full h-full space-y-4">
-        {/* Header */}
-        <div className="flex justify-between items-center text-gray-100">
-          <h2 className="text-xl font-bold">TECHNICAL INTERVIEW – {candidate?.member.name}</h2>
-          <div className="flex items-center space-x-2 text-sm">
-            <span>Question {questionNumber} / 12</span>
-            {currentDay && <span>{currentDay}</span>}
-            <span className="text-green-400">● Adaptive interviewer</span>
-          </div>
-          <button onClick={reset} className="bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-sm">
-            Cancel
-          </button>
+      <div className="flex flex-col max-w-4xl w-full h-[100dvh] mx-auto bg-slate-900 border-x border-slate-800">
+        <div className="px-4 pt-4 shrink-0">
+          <InterviewHeader
+            candidateName={candidate?.member.name ?? ''}
+            candidateRole={candidate?.member.jobRole ?? ''}
+            questionNumber={questionNumber}
+            currentDay={currentDay}
+            onEnd={reset}
+          />
         </div>
+        
         {/* Conversation */}
-        <div className="flex-1 overflow-y-auto bg-gray-800 rounded p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
           {messages.map((m, i) => {
             const isAgent = m.role === 'agent';
-            const bubbleClass = isAgent ? 'bg-gray-700 text-white' : 'bg-indigo-600 text-white';
-            const align = isAgent ? 'text-left' : 'text-right';
-            const showFollowUp = isAgent && i > 2; // after first question
             return (
-              <div key={i} className={align}>
-                <div className={`inline-block max-w-xs rounded-lg p-3 mb-1 ${bubbleClass}`}>
-                  {showFollowUp && (
-                    <span className="inline-block bg-yellow-600 text-xs text-white px-1 rounded mr-2 mb-1">FOLLOW‑UP</span>
-                  )}
-                  {m.text}
+              <div key={i} className={`flex w-full ${isAgent ? 'justify-start' : 'justify-end'}`}>
+                <div className={`max-w-[85%] md:max-w-[75%] space-y-1 ${isAgent ? 'order-1' : 'order-2'}`}>
+                  <div className={`text-[10px] font-bold tracking-wider uppercase text-slate-500 ${isAgent ? 'text-left' : 'text-right'}`}>
+                    {isAgent ? 'INTERVIEWER' : 'YOU'}
+                  </div>
+                  <div 
+                    className={`
+                      px-4 py-3 rounded-lg text-sm md:text-base leading-relaxed
+                      ${isAgent 
+                        ? 'bg-slate-800 text-slate-200 border border-slate-700/50 rounded-tl-none' 
+                        : 'bg-blue-600 text-white rounded-tr-none'
+                      }
+                    `}
+                  >
+                    {m.text}
+                  </div>
                 </div>
-                {isAgent && (
-                  <div className="text-xs text-gray-400 mt-0.5 italic">Personalized from your learning journey</div>
-                )}
               </div>
             );
           })}
+          {loading && (
+            <div className="flex justify-start w-full">
+              <div className="max-w-[85%] md:max-w-[75%] space-y-1">
+                <div className="text-[10px] font-bold tracking-wider uppercase text-slate-500 text-left">
+                  INTERVIEWER
+                </div>
+                <div className="px-4 py-3 rounded-lg bg-slate-800 border border-slate-700/50 text-slate-400 text-sm flex items-center gap-2 rounded-tl-none">
+                  <span className="animate-pulse">●</span>
+                  <span className="animate-pulse animation-delay-200">●</span>
+                  <span className="animate-pulse animation-delay-400">●</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
+
         {/* Input */}
-        <form onSubmit={sendMessage} className="flex space-x-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={loading}
-            placeholder="Your response…"
-            className="flex-1 px-3 py-2 rounded bg-gray-700 text-white disabled:bg-gray-600"
-          />
-          <button
-            type="submit"
-            disabled={loading || !input.trim()}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded disabled:bg-gray-500"
-          >
-            Send
-          </button>
-        </form>
-        {loading && <div className="text-sm text-gray-400 mt-2">Evaluating response…</div>}
+        <div className="shrink-0 p-4 bg-slate-900 border-t border-slate-800">
+          <form onSubmit={sendMessage} className="flex gap-2">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading}
+              placeholder={loading ? 'Waiting for response...' : 'Type your answer here... (Shift+Enter for new line)'}
+              className="flex-1 px-4 py-3 rounded-md bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none min-h-[56px] max-h-[150px] disabled:opacity-50"
+              rows={1}
+            />
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors self-end h-[56px]"
+            >
+              Send
+            </button>
+          </form>
+        </div>
       </div>
     );
   };
 
   const renderFeedback = () => (
-    <div className="max-w-3xl w-full space-y-4 bg-gray-800 rounded p-6 text-gray-100">
-      <h2 className="text-2xl font-bold mb-2">Interview Complete</h2>
-      <p className="text-lg mb-4">Here's how your technical understanding came across.</p>
-      <section className="mb-4">
-        <h3 className="font-semibold">Summary</h3>
-        <p>{feedback?.summary}</p>
-      </section>
-      <section className="mb-4">
-        <h3 className="font-semibold">What You Did Well</h3>
-        <ul className="list-disc list-inside">
-          {feedback?.strengths.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ul>
-      </section>
-      <section className="mb-4">
-        <h3 className="font-semibold">Where to Improve</h3>
-        <ul className="list-disc list-inside">
-          {feedback?.gaps.map((g, i) => (
-            <li key={i}>{g}</li>
-          ))}
-        </ul>
-      </section>
-      <section className="mb-4">
-        <h3 className="font-semibold">Next Moves</h3>
-        <ul className="list-disc list-inside">
-          {feedback?.next.map((n, i) => (
-            <li key={i}>{n}</li>
-          ))}
-        </ul>
-      </section>
-      <button
-        onClick={reset}
-        className="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 py-2 rounded"
-      >
-        Start New Interview
-      </button>
+    <div className="max-w-3xl w-full mx-auto p-4 py-10 space-y-8">
+      <div className="space-y-2 border-b border-slate-700/60 pb-6">
+        <h2 className="text-3xl font-bold text-slate-100 tracking-tight">Interview Report</h2>
+        <p className="text-slate-400">Feedback and analysis for <span className="text-slate-300 font-medium">{candidate?.member.name}</span></p>
+      </div>
+      
+      <div className="space-y-8 text-slate-300 text-sm md:text-base">
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>
+            Summary
+          </h3>
+          <p className="bg-slate-800/50 p-4 rounded-lg border border-slate-700/30 leading-relaxed">
+            {feedback?.summary}
+          </p>
+        </section>
+        
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold text-emerald-400 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+            Strengths
+          </h3>
+          <ul className="space-y-2">
+            {feedback?.strengths.map((s, i) => (
+              <li key={i} className="flex gap-3 bg-slate-800/30 p-3 rounded-md border border-slate-700/20">
+                <span className="text-emerald-500 mt-0.5">✓</span>
+                <span className="leading-relaxed">{s}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+        
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold text-amber-400 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>
+            Areas for Improvement
+          </h3>
+          <ul className="space-y-2">
+            {feedback?.gaps.map((g, i) => (
+              <li key={i} className="flex gap-3 bg-slate-800/30 p-3 rounded-md border border-slate-700/20">
+                <span className="text-amber-500 mt-0.5">!</span>
+                <span className="leading-relaxed">{g}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+        
+        <section className="space-y-3">
+          <h3 className="text-lg font-semibold text-blue-400 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>
+            Next Steps
+          </h3>
+          <ul className="space-y-2">
+            {feedback?.next.map((n, i) => (
+              <li key={i} className="flex gap-3 bg-slate-800/30 p-3 rounded-md border border-slate-700/20">
+                <span className="text-blue-500 mt-0.5">→</span>
+                <span className="leading-relaxed">{n}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <div className="pt-8 border-t border-slate-700/60">
+        <button
+          onClick={reset}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-6 py-2.5 rounded-md font-medium transition-colors border border-slate-600"
+        >
+          Return to Candidate Selection
+        </button>
+      </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4 text-gray-100">
+    <div className="min-h-[100dvh] bg-slate-900 text-slate-200">
       {stage === 'select' && renderSelection()}
       {stage === 'interview' && candidate && renderInterview()}
       {stage === 'feedback' && feedback && renderFeedback()}
